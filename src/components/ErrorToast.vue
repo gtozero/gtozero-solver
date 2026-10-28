@@ -288,6 +288,19 @@ const M = {
     copiedHint: "Wklej je tam, gdzie chcesz je zachować lub komuś przekazać. Przed udostępnieniem sprawdź treść.",
     promptCopy: "Skopiuj poniższy tekst",
   },
+
+  th: {
+    title: "บันทึกข้อผิดพลาดแล้ว",
+    body1: "ห⁠า⁠กพบสิ่งผิดปกติ แจ้งให้เราทราบได้ รายละเอียดเก็บไว้",
+    bodyB1: "บนอุ⁠ป⁠ก⁠ร⁠ณ์นี้เท่านั้น",
+    body2: " และคุณเลือกได้ว่าจะส่งให้เราหรือไม่",
+    copied: "คัดลอกแล้ว",
+    copyButton: "คัดลอกบันทึกข้อผิดพลาด",
+    close: "ปิด",
+    copiedHint:
+      "วางข้อความไว้ในที่ที่ต้⁠อ⁠งการเพื่อแชร์หรือเก็บไว้ ตรวจสอบเนื้อห⁠า⁠ก่อนแชร์",
+    promptCopy: "คัดลอกข้อความด้านล่าง",
+  },
 } as const;
 
 export default defineComponent({
@@ -310,6 +323,8 @@ export default defineComponent({
         "एक थ्रेड से फिर कोशिश करें", "Tek thread ile tekrar dene", "Thử lại với một thread", "Повторить в одном потоке",
     "إعادة المحاولة بخيط واحد",
         "Riprova con un solo thread", "Spróbuj ponownie z jednym wątkiem"
+      ,
+        "ลองอีกครั้งด้วยเธรดเดียว"
       )
     );
     const copied = ref(false);
