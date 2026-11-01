@@ -7,5 +7,6 @@ export const trackFeatureOpen = (..._args: unknown[]): void => {};
 export const trackCalcStart = (..._args: unknown[]): void => {};
 export const trackCalcDone = (..._args: unknown[]): void => {};
 export const trackCalcFail = (..._args: unknown[]): void => {};
+export const trackCalcStall = (..._args: unknown[]): void => {};
 export const trackShare = (..._args: unknown[]): void => {};
 export const trackSave = (..._args: unknown[]): void => {};
