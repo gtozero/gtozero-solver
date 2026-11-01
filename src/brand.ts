@@ -50,4 +50,5 @@ export const BRAND_NAME: Record<Locale, string> = IS_SOLO ? VARIANT_TEXT!.brandN
     it: "GTOZero GTO Trainer",
     pl: "GTOZero GTO Trainer",
     th: "GTOZero GTO Trainer",
+    uk: "GTOZero GTO Trainer",
   };

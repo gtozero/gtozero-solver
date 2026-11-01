@@ -26,5 +26,5 @@ The site must be served with `Cross-Origin-Embedder-Policy: require-corp` and `C
 
 ## Modification notice
 
-- This version is a modified version of WASM Postflop by GTOZero. Source modified as of: 2026-11-01
+- This version is a modified version of WASM Postflop by GTOZero. Source modified as of: 2026-11-02
 - Precomputed data, account configuration and the separate /study/ app are not part of this repository. Screens that use that data (default trainer problems, example previews) do not behave exactly like the live app from this source alone.
