@@ -10,3 +10,5 @@ export const trackCalcFail = (..._args: unknown[]): void => {};
 export const trackCalcStall = (..._args: unknown[]): void => {};
 export const trackShare = (..._args: unknown[]): void => {};
 export const trackSave = (..._args: unknown[]): void => {};
+export const trackSubFeatureOpen = (..._args: unknown[]): void => {};
+export const trackCount = (..._args: unknown[]): void => {};
