@@ -29,4 +29,5 @@ export const MAIN_SITE_CONFIG: MainSite = {
   languagePicker: true, // gtozero.com은 en·es뿐이라 페깅할 언어별 사이트가 없다
   homeOnlyLinks: true,
   utmSource: "app",
+  privacyUrl: "", // gtozero 쪽 방침 페이지가 정해지면 넣는다
 };
