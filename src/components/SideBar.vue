@@ -2,11 +2,13 @@
   <aside
     class="app-sidebar flex flex-col shrink-0 w-full md:w-56 my-0 md:my-2 md:overflow-y-auto border-b md:border-b-0 md:border-e border-neutral-700"
   >
-    <div class="mobile-menu-groups md:hidden">
-      <button :aria-pressed="!isCustom" :class="{ 'menu-group-active': !isCustom }" @click="openGroup(false)">{{ L.exploreLabel }}</button>
-      <button :aria-pressed="isCustom" :class="{ 'menu-group-active': isCustom }" @click="openGroup(true)">{{ L.customLabel }}{{ L.customLabelSuffix }}</button>
-    </div>
+    <!-- MB-636 ③: 폰 메뉴가 세 줄(상단 탭 · 둘러보기/커스텀 전환 · 가로 메뉴)이라 첫 화면 위 1/3을 먹었다.
+         전환 줄을 없애고 각 가로 메뉴 맨 앞에 «다른 묶음으로» 칩 하나를 둔다(글자는 기존 묶음 이름 — 새 문구 없음).
+         PC에는 두 패널이 늘 보이므로 칩은 폰에서만. -->
     <div class="side-bar-group md:mb-1" :class="{ 'mobile-group-active': !isCustom }" @scroll.passive="onMenuScroll">
+    <button class="group-switch md:hidden" data-testid="group-switch-custom" @click="openGroup(true)">
+      {{ L.customLabel }}<svg class="group-switch-arrow" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M7.5 4.5 13 10l-5.5 5.5-1.4-1.4L10.2 10 6.1 5.9z"/></svg>
+    </button>
     <div class="side-bar-label hidden md:block">
       {{ L.exploreLabel }}<span class="hidden md:inline">{{ L.exploreLabelSuffix }}</span>
     </div>
@@ -89,6 +91,9 @@
     </div>
 
     <div class="side-bar-group" :class="{ 'mobile-group-active': isCustom }" @scroll.passive="onMenuScroll">
+    <button class="group-switch group-switch-back md:hidden" data-testid="group-switch-explore" @click="openGroup(false)">
+      <svg class="group-switch-arrow" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M12.5 4.5 7 10l5.5 5.5 1.4-1.4L9.8 10l4.1-4.1z"/></svg>{{ L.exploreLabel }}
+    </button>
     <!-- 높이 예산을 유지하므로 범례는 데스크톱 제목의 툴팁과 접근성 설명으로 제공한다. -->
     <div class="side-bar-label hidden md:block" data-testid="step-legend" :title="L.stepLegend" :aria-label="L.customLabel + ': ' + L.stepLegend" role="note" tabindex="0">
       {{ L.customLabel }}<span class="hidden md:inline">{{ L.customLabelSuffix }}</span>
@@ -956,9 +961,26 @@ export default defineComponent({
   @apply md:block md:mx-1 md:py-1 md:rounded-lg;
   @apply md:border md:border-neutral-700 md:bg-surface-1;
 }
-.mobile-menu-groups { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 4px; padding: 4px 8px; background: rgb(var(--c-bg-1)); }
-.mobile-menu-groups button { min-height: 40px; padding: 4px 8px; border: 1px solid rgb(var(--c-line)); border-radius: 6px; color: rgb(var(--c-text-secondary)); font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
-.mobile-menu-groups .menu-group-active { color: rgb(var(--c-brand)); background: rgb(var(--c-bg-3)); border-color: rgb(var(--c-brand)); }
+/* 폰 가로 메뉴 맨 앞 «다른 묶음으로» 칩 — 메뉴 항목과 구별되게 테두리 칩.
+   활성 항목을 가운데로 맞추면 칩이 왼쪽 밖으로 밀려 첫 화면에서 안 보였다 → 줄 맨 앞에 붙여 두고
+   (sticky) 바탕색 테두리(box-shadow)로 그 밑을 지나가는 항목을 가린다. 그래서 이 줄은 앞쪽 페이드를 쓰지 않는다. */
+.group-switch {
+  display: inline-flex; flex: none; align-items: center; gap: 2px; align-self: center;
+  position: sticky; inset-inline-start: 6px; z-index: 1;
+  min-height: 34px; margin: 0 6px; padding: 4px 8px 4px 10px; white-space: nowrap;
+  border: 1px solid rgb(var(--c-brand) / 0.55); border-radius: 999px;
+  background: rgb(var(--c-bg-0)); box-shadow: 0 0 0 6px rgb(var(--c-bg-0));
+  color: rgb(var(--c-brand)); font-size: 13px; font-weight: 600;
+}
+/* 칩 뒤로 지나가는 항목이 칼로 자른 듯 잘려(«⚡» 끝만 남음) 보였다 → 칩 바로 뒤에 짧은 페이드 */
+.group-switch::after {
+  content: ""; position: absolute; top: -6px; bottom: -6px; inset-inline-start: calc(100% + 6px); width: 16px;
+  background: linear-gradient(to right, rgb(var(--c-bg-0)), rgb(var(--c-bg-0) / 0)); pointer-events: none;
+}
+:global(html[dir="rtl"] .group-switch::after) { background: linear-gradient(to left, rgb(var(--c-bg-0)), rgb(var(--c-bg-0) / 0)); }
+.group-switch-back { padding: 4px 10px 4px 6px; }
+.group-switch-arrow { width: 16px; height: 16px; flex: none; }
+:global(html[dir="rtl"] .group-switch-arrow) { transform: scaleX(-1); }
 .step-status { display: inline-block; margin-inline-start: 5px; color: rgb(var(--c-text-muted)); font-size: 12px; }
 .step-next { color: rgb(var(--c-brand)); }
 .step-next::after { content: ""; display: inline-block; width: 4px; height: 4px; margin: 0 0 2px; margin-inline-start: 3px; border-radius: 50%; background: currentColor; }
@@ -971,7 +993,6 @@ export default defineComponent({
     -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent 100%);
     mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent 100%);
   }
-  .side-bar-group.fade-start { --fade-l: 16px; }
   .side-bar-group.fade-end { --fade-r: 16px; }
   :global(html[dir="rtl"] .side-bar-group){
     -webkit-mask-image: linear-gradient(to left, transparent 0, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent 100%);
@@ -992,7 +1013,8 @@ export default defineComponent({
 }
 :global(html[dir="rtl"] .side-bar-item.text-blue-300){ box-shadow: inset -2px 0 0 rgb(var(--c-brand)); }
 @media (min-width: 768px) {
-  .mobile-menu-groups { display: none; }
+  /* 위 .group-switch의 display가 md:hidden보다 세다(scoped 속성 선택자) — PC는 두 패널이 늘 보이니 칩을 숨긴다 */
+  .group-switch { display: none; }
   .side-bar-item .step-status { position: absolute; inset-inline-end: 5px; top: 4px; font-size: 10px; }
   .side-bar-item:has(.step-status) { padding-inline-end: 20px; }
   .side-bar-item:has(table) {

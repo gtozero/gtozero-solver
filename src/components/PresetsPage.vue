@@ -16,6 +16,8 @@
         >{{ L.infoText1
         }}<span class="font-semibold">{{ L.infoBtn2 }}</span
         >{{ L.infoText2 }}
+        <!-- MB-636 ②: 아래 분류 줄의 OOP·IP와 결과의 EV를 처음 보는 사람용 한 줄 -->
+        <div class="mt-1 text-xs text-neutral-500" data-testid="term-glossary">{{ glossary }}</div>
       </div>
     </div>
 
@@ -104,6 +106,7 @@ import {
 import { trackOutbound } from "../outbound";
 import { notePresetOpened } from "../pwa";
 import { i18n } from "../i18n";
+import { uxHintLabels } from "../ux-hint-labels";
 
 import { InformationCircleIcon } from "@heroicons/vue/20/solid";
 import PresetPreview from "./PresetPreview.vue";
@@ -530,6 +533,7 @@ export default defineComponent({
     const isAr = computed(() => i18n.locale === "ar");
 
     return {
+      glossary: computed(() => uxHintLabels(i18n.locale).glossary),
       grouped,
       boardCards,
       load,

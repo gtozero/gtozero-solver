@@ -12,6 +12,21 @@
     </button>
   </div>
 
+  <!-- R2_REVIEW_ONLY_START -->
+  <!-- MB-636 ④: 이 문제가 플랍 조회에 이미 풀려 있으면(조건 = precomputed-spot.ts) 기다리기 전에 알린다.
+       버튼 글자 = 플랍 조회 메뉴 이름 + «→» · 계산이 끝난 뒤에는 숨긴다 -->
+  <div
+    v-if="precomputedSpot && !store.isSolverFinished"
+    class="flex flex-wrap items-center gap-x-3 gap-y-2 mb-3 px-3 py-2 text-sm text-ink-secondary bg-surface-2 border border-brand/50 rounded-lg"
+    data-testid="precomputed-note"
+  >
+    <span>{{ H.precomputed }}</span>
+    <button class="button-base button-blue button-primary" data-testid="precomputed-open" @click="openPrecomputed">
+      {{ flopStudyTitle }} →
+    </button>
+  </div>
+  <!-- R2_REVIEW_ONLY_END -->
+
   <div class="solver-run-toolbar flex flex-wrap my-1 items-center gap-y-2 text-sm">
     {{ L.numThreadsLabel }}
     <input
@@ -214,6 +229,11 @@
       />
     </div>
 
+    <!-- MB-636 ①: 실행 전 예상 시간(solve-time-estimate.ts) — 계산을 시작하면 숨긴다 -->
+    <div v-if="!store.hasSolverRun && estimateText" class="mt-3 text-ink-secondary" data-testid="solve-estimate">
+      {{ estimateText }}
+    </div>
+
     <div class="flex flex-wrap mt-5 gap-2">
       <button
         class="button-base button-blue button-primary"
@@ -343,6 +363,11 @@ import {
   readableLineString,
 } from "../utils";
 import { detect } from "detect-browser";
+import { uxHintLabels } from "../ux-hint-labels";
+import { estimateSolveMs, isMobileDevice, roundedMinutes } from "../solve-time-estimate";
+import { FEATURE_TRAINER, flopStudyLabels, openStudyApp } from "@features"; // R2_REVIEW_ONLY
+import { matchPrecomputedSpot, precomputedStudySearch } from "../precomputed-spot"; // R2_REVIEW_ONLY
+import { trackPrecomputedOpen } from "../usage-analytics"; // R2_REVIEW_ONLY
 
 import { Tippy } from "vue-tippy";
 import { QuestionMarkCircleIcon } from "@heroicons/vue/20/solid";
@@ -2487,6 +2512,38 @@ export default defineComponent({
     };
 
     const navResultsLabel = computed(() => navResults[i18n.locale]);
+
+    // ── MB-636 ① 실행 전 예상 시간 (근거·상수 = solve-time-estimate.ts) ──
+    const H = computed(() => uxHintLabels(i18n.locale));
+    const mobileDevice = isMobileDevice();
+    const durationText = (ms: number) => {
+      const minutes = roundedMinutes(ms);
+      return minutes === null ? H.value.underMinute : H.value.minutes(minutes, localizeNumber(String(minutes)));
+    };
+    const estimateText = computed(() => {
+      if (!isTreeBuilt.value || treeStatusState.value.type !== "built") return "";
+      const ms = estimateSolveMs({
+        uncompressedBytes: memoryUsage.value,
+        compressed: isCompressionEnabled.value,
+        threads: treeStatusState.value.threads,
+        targetPct: Number(targetExploitability.value),
+        maxIterations: Number(maxIterations.value),
+        mobile: mobileDevice,
+      });
+      return ms === null ? "" : H.value.estimate(durationText(ms));
+    });
+    // 계산 중 «남은 시간»은 넣었다가 뺐다(11-23 실측: 4GB 트리에서 오차 곡선이 뒤쪽에 정체해 «1분 이내» 뒤 2분 넘게 더 걸림 ·
+    // 곡선 어림 세 가지를 바꿔 봐도 같음) — 틀린 카운트다운보다 «현재 오차 → 목표» 줄과 «결과 →»(오차 1%)가 낫다.
+
+    // ── MB-636 ④ 같은 문제가 플랍 조회에 있으면 안내 (조건 = precomputed-spot.ts) ── // R2_REVIEW_ONLY
+    const precomputedSpot = computed(() => (FEATURE_TRAINER ? matchPrecomputedSpot(config, store.rangeText) : null)); // R2_REVIEW_ONLY
+    const flopStudyTitle = computed(() => (FEATURE_TRAINER ? flopStudyLabels(i18n.locale).navTitle : "")); // R2_REVIEW_ONLY
+    const openPrecomputed = () => { // R2_REVIEW_ONLY
+      const spot = precomputedSpot.value; // R2_REVIEW_ONLY
+      if (!spot) return; // R2_REVIEW_ONLY
+      trackPrecomputedOpen(); // R2_REVIEW_ONLY
+      openStudyApp(precomputedStudySearch(spot, config.board)); // R2_REVIEW_ONLY
+    }; // R2_REVIEW_ONLY
     return {
       store,
       lockStore,
@@ -2526,6 +2583,11 @@ export default defineComponent({
       stoppedEarly,
       exploitabilityText,
       timeText,
+      H,
+      estimateText,
+      precomputedSpot, // R2_REVIEW_ONLY
+      flopStudyTitle, // R2_REVIEW_ONLY
+      openPrecomputed, // R2_REVIEW_ONLY
       buildTree,
       runSolver,
       resumeSolver,

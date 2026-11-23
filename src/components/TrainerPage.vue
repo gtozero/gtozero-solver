@@ -559,6 +559,8 @@
           <p class="mt-2 text-sm leading-relaxed text-neutral-500">
             {{ L.resultHintBefore }}<b class="text-neutral-400">{{ L.resultHintBold }}</b>{{ L.resultHintAfter }}
           </p>
+          <!-- MB-636 ②: 문제 칸의 (OOP)·(IP)와 채점의 EV 한 줄 풀이 -->
+          <p class="mt-2 text-xs leading-relaxed text-neutral-500" data-testid="term-glossary">{{ glossary }}</p>
           <p class="mt-3 text-xs leading-relaxed text-neutral-600">
             <!-- ⚠ 두 문장 사이의 «이음새»다. 줄바꿈을 그대로 두면 Vue가 공백 하나를 넣는데,
                  CJK(일본어·중국어)는 「。」가 이미 여백을 품고 있어 «국면입니다。 이…»처럼 벌어진다
@@ -716,6 +718,7 @@ import {
 import { RNG_M } from "../trainer-rng-labels";
 import { cardText, formatBb } from "../utils";
 import { flopTrainerLabels } from "../flop-trainer-labels";
+import { uxHintLabels } from "../ux-hint-labels";
 import { isFlopAttempt, openFlopTrainer } from "../study-handoff";
 import ProviderIcon from "./ProviderIcon.vue";
 import {
@@ -3469,6 +3472,7 @@ export default defineComponent({
     };
 
     return {
+      glossary: computed(() => uxHintLabels(i18n.locale).glossary),
       plCountText,
       isAr: computed(() => i18n.locale === "ar"),
       rtlText,
