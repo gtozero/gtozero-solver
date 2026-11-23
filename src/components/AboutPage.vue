@@ -43,16 +43,19 @@
         >
           {{ L.ctaPreflop }}
         </button>
+      </div>
+      <!-- MB-636: 첫 행동을 하나로 모은다 — 큰 버튼은 위 하나, 나머지는 작은 글자 링크 한 줄 -->
+      <div class="flex flex-wrap items-center gap-x-5 gap-y-1 mt-3" data-w2="home-sub-links">
         <button
           v-if="FEATURE_TRAINER"
-          class="button-base bg-surface-3 text-ink-primary border border-neutral-700 hover:bg-surface-4"
+          class="home-sub-link"
           @click="store.sideView = 'trainer'"
         >
           {{ L.ctaTrainer }}
         </button>
         <button
           v-else
-          class="button-base bg-surface-3 text-ink-primary border border-neutral-700 hover:bg-surface-4"
+          class="home-sub-link"
           @click="store.sideView = 'equity'"
         >
           {{ L.ctaEquity }}
@@ -60,7 +63,7 @@
         <!-- 매일 하나뿐이라 «오늘 건 풀었나»가 돌아올 이유가 된다 -->
         <button
           v-if="FEATURE_TRAINER"
-          class="button-base bg-surface-3 text-ink-primary border border-neutral-700 hover:bg-surface-4 flex items-center gap-2"
+          class="home-sub-link flex items-center gap-1.5"
           @click="openDaily"
         >
           {{ L.ctaDaily }}
@@ -68,7 +71,7 @@
           <span v-else class="text-brand">●</span>
         </button>
         <button
-          class="button-base bg-surface-3 text-ink-primary border border-neutral-700 hover:bg-surface-4"
+          class="home-sub-link"
           @click="store.sideView = 'guide'"
         >
           {{ L.ctaGuide }}
@@ -76,10 +79,7 @@
         <!-- 설치 가능한 환경에서만 노출 (이미 설치해서 실행 중이면 숨김) -->
         <button
           v-if="canShowInstallButton()"
-          :class="
-            'button-base bg-surface-3 border border-neutral-700 hover:bg-surface-4 ' +
-            'text-ink-primary flex items-center gap-2'
-          "
+          class="home-sub-link flex items-center gap-1.5"
           @click="requestInstall"
         >
           <span aria-hidden="true">&#9824;</span>
@@ -1173,6 +1173,10 @@ export default defineComponent({
 </script>
 
 <style scoped>
+/* 보조 행동 — 버튼 무게를 빼고 글자 링크로(폰에서도 누를 높이 32px은 남긴다) */
+.home-sub-link {
+  @apply min-h-[2rem] text-sm text-neutral-300 underline decoration-neutral-600 underline-offset-4 hover:text-white hover:decoration-neutral-400;
+}
 .home-intro {
   @apply rounded-lg border border-neutral-700 bg-surface-1 p-4 md:p-5;
 }

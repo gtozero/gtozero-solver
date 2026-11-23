@@ -25,3 +25,4 @@ export const trackSharedOpen = (..._args: unknown[]): void => {};
 export const trackInstall = (..._args: unknown[]): void => {};
 export const trackLocaleSwitch = (..._args: unknown[]): void => {};
 export const trackCalcConfigStart = (..._args: unknown[]): void => {};
+export const trackEarlyResult = (..._args: unknown[]): void => {};

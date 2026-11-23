@@ -279,6 +279,18 @@
       <br />
       {{ timeText }}
 
+      <!-- MB-636: 목표(기본 0.3%)까지 기다리지 않아도 오차 1%면 결과를 볼 만하다 — 누르면 지금까지로 멈추고 결과 화면으로.
+           글자는 아래 «결과 →»와 같은 문자열(새 번역 없음). 멈춘 뒤 상태 줄은 기존 «목표 전에 멈춤» 문구가 맡는다. -->
+      <div v-if="earlyResultReady" class="mt-4">
+        <button
+          class="button-base button-blue button-primary"
+          data-testid="early-results"
+          @click="viewEarlyResult"
+        >
+          {{ navResultsLabel }} →
+        </button>
+      </div>
+
       <!-- 계산이 끝나도 결과로 가는 길이 상단 탭밖에 없었다 — 처음 쓰는 사람은 여기서 멈춘다.
            글자는 상단 탭과 **같은 문자열**을 쓴다(nav-labels.ts) — 어디로 가는 버튼인지 바로 알게.
            표시 조건은 상단 «결과» 탭의 활성 조건과 같다(store.isSolverFinished). -->
@@ -301,7 +313,7 @@ import { init, handler, onWorkerFailure, terminate } from "../global-worker";
 import { clearSolverRetry, reportMemoryFailure, reportSolverError } from "../errors";
 import { encodeSpotUrl, InvalidSpotLinesError } from "../spot-share";
 import { supportNote } from "../support-note";
-import { trackCalcConfigStart, trackCalcStart, trackCalcDone, trackCalcFail, trackHelpOpen, trackInputError, trackShare } from "../usage-analytics";
+import { trackCalcConfigStart, trackCalcStart, trackCalcDone, trackCalcFail, trackEarlyResult, trackHelpOpen, trackInputError, trackShare } from "../usage-analytics";
 import { failureKind, failureReason } from "../solver-failure";
 import { MEMORY_FAILURE_LABELS } from "../solver-failure-labels";
 import { MEMORY_LIMIT_TIP } from "../memory-limit-tip";
@@ -1872,6 +1884,8 @@ export default defineComponent({
     const isCompressionEnabled = ref(false);
     const terminateFlag = ref(false);
     const pauseFlag = ref(false);
+    // 오차 1% 이하에서 «결과 →»를 눌렀다 — 멈춘 뒤 결과 화면으로 바로 간다(MB-636 «기다림» 대책)
+    const earlyResult = ref(false);
     const currentIteration = ref(-1);
     const exploitability = ref(Number.POSITIVE_INFINITY);
     const elapsedTimeMs = ref(-1);
@@ -1921,6 +1935,22 @@ export default defineComponent({
       return !!meta && meta.achievedExploitabilityPct > meta.targetExploitabilityPct * (1 + 1e-9);
     });
 
+    // 목표가 1%보다 엄격한 계산이 1%에 닿으면 «결과 →»를 띄운다. 1%는 사전 계산 첫 기준(09-28)이자
+    // 판정 노이즈 실측에서 «쓸 만한» 선이었다. 진행 중 오차는 10회마다 갱신된다.
+    const EARLY_RESULT_PCT = 1;
+    const earlyResultReady = computed(() =>
+      (store.isSolverRunning || store.isSolverPaused) && !store.isFinalizing && !earlyResult.value &&
+      !terminateFlag.value && targetExploitability.value < EARLY_RESULT_PCT &&
+      Number.isFinite(exploitability.value) &&
+      (exploitability.value * 100) / savedConfig.startingPot <= EARLY_RESULT_PCT);
+    const viewEarlyResult = () => {
+      if (!earlyResultReady.value) return;
+      earlyResult.value = true;
+      terminateFlag.value = true;
+      // 일시정지 중이면 루프가 없으니 재개 경로로 마무리(finalize)만 돌린다 — 루프는 terminateFlag로 바로 빠진다
+      if (store.isSolverPaused) void resumeSolver();
+    };
+
     const iterationText = computed(() => {
       if (currentIteration.value === -1) {
         return L.value.allocatingMemory;
@@ -1965,6 +1995,7 @@ export default defineComponent({
       store.isFinalizing = false;
       terminateFlag.value = false;
       pauseFlag.value = false;
+      earlyResult.value = false;
       startTime = 0;
       treeStatusState.value = { type: "failed" };
       // 메모리를 못 얻었으면 단일 스레드로 다시 해도 또 실패한다 — 16비트 정수로 다시, 그것도 넘으면 나무를 줄이라고만
@@ -2169,6 +2200,7 @@ export default defineComponent({
         if (epoch !== lockStore.epoch) return;
         terminateFlag.value = false;
         pauseFlag.value = false;
+        earlyResult.value = false;
         currentIteration.value = -1;
         exploitability.value = Number.POSITIVE_INFINITY;
         elapsedTimeMs.value = -1;
@@ -2303,8 +2335,16 @@ export default defineComponent({
         const end = performance.now();
         elapsedTimeMs.value += end - startTime;
         startTime = 0;
-        // «중지»도 결과를 내며 끝나지만 사용자가 멈춘 것이라 완료로 세지 않는다
-        if (terminateFlag.value) closeCalcFailed("user_stop");
+        // «중지»도 결과를 내며 끝나지만 사용자가 멈춘 것이라 완료로 세지 않는다.
+        // 다만 오차 1% 이하에서 «결과 →»로 끝낸 것은 쓸 만한 결과를 받은 것이라 완료로 세고 따로 표시한다(MB-636)
+        if (earlyResult.value) {
+          if (calcOpen) {
+            trackCalcDone("custom", elapsedTimeMs.value);
+            trackEarlyResult();
+            calcOpen = false;
+          }
+          store.navView = "results";
+        } else if (terminateFlag.value) closeCalcFailed("user_stop");
         else if (calcOpen) {
           trackCalcDone("custom", elapsedTimeMs.value);
           calcOpen = false;
@@ -2478,6 +2518,8 @@ export default defineComponent({
       isCompressionEnabled,
       terminateFlag,
       pauseFlag,
+      earlyResultReady,
+      viewEarlyResult,
       memoryUsageSelected,
       canRun,
       iterationText,
