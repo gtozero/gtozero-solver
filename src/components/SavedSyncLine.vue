@@ -125,10 +125,27 @@ export default defineComponent({
     // 목록이 바뀌거나 로그인하면 강조를 거둔다
     watch([() => props.itemCount, user], () => (nudged.value = ""));
 
+    // 대기 중인 업로드는 온라인 복귀·이 화면을 다시 열 때도 다시 올린다 — 화면은 v-show로 남아
+    // onMounted가 다시 돌지 않아 안내(«다음에 이 화면을 열면»)와 달랐다 (11-25 검수 A-04)
+    const retryPending = () => {
+      if (user.value && status.value.state === "pending") requestSavedSync(props.storeName);
+    };
+    const visible = computed(
+      () =>
+        store.navView === "solver" &&
+        (props.storeName === "ranges"
+          ? store.sideView === "oop-range" || store.sideView === "ip-range"
+          : store.sideView === "tree-config")
+    );
+    watch(visible, (v) => {
+      if (v) retryPending();
+    });
+
     let stopAuth: (() => void) | null = null;
     let stopReplaced: (() => void) | null = null;
     onMounted(async () => {
       if (!enabled) return;
+      window.addEventListener("online", retryPending);
       stopReplaced = onSavedReplaced((s) => {
         if (s === props.storeName) emit("replaced");
       });
@@ -154,6 +171,7 @@ export default defineComponent({
       if (user.value) void syncSavedStore(props.storeName);
     });
     onBeforeUnmount(() => {
+      window.removeEventListener("online", retryPending);
       stopAuth?.();
       stopReplaced?.();
     });

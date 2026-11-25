@@ -970,6 +970,27 @@ export const vs4betRangeTextFor = (
   action: "fiveBet" | "call"
 ): string => tiersToRangeText(VS_4BET[id][action]);
 
+// 복사용 — 표는 조건부 빈도지만 포스트플랍 입력은 그 액션까지 도달한 비율이어야 한다.
+// preflop-spots.ts의 threeBetSpot/fourBetSpot과 같은 곱·같은 표기(글자까지 같게).
+const reachText = (base: number[], cond: number[]): string =>
+  cond
+    .map((c, i) => [handLabelAt(i), +((base[i] * c) / 10000).toFixed(4)] as const)
+    .filter(([, w]) => w > 0)
+    .map(([hand, w]) => (w === 1 ? hand : `${hand}:${w}`))
+    .join(",");
+
+/** vs 3벳 복사 문자열 — 오픈 빈도 × 대응 빈도 */
+export const vs3betReachTextFor = (id: Vs3BetId, action: "fourBet" | "call"): string => {
+  const opener = (VS3BET_SCENARIOS.find((s) => s.id === id) as Vs3BetScenario).opener;
+  return reachText(gridFor(opener), vs3betGridsFor(id)[action]);
+};
+
+/** vs 4벳 복사 문자열 — 3벳 빈도 × 대응 빈도 */
+export const vs4betReachTextFor = (id: Vs4BetId, action: "fiveBet" | "call"): string => {
+  const scenario = VS4BET_SCENARIOS.find((s) => s.id === id) as Vs4BetScenario;
+  return reachText(defendGridsFor(scenario.base).threeBet, vs4betGridsFor(id)[action]);
+};
+
 /** 검증 스크립트용 훅 — preflop-verify.js가 데이터 무결성을 검사할 때 쓴다 */
 declare global {
   interface Window {

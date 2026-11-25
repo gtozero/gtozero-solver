@@ -108,7 +108,11 @@ const getClient = async (): Promise<SupabaseClient | null> => {
   if (!clientPromise) {
     clientPromise = import(
       /* webpackChunkName: "supabase" */ "@supabase/ssr"
-    ).then(async (mod) => {
+    ).catch((error) => {
+      // 청크를 못 받았으면(오프라인·일시 오류) 실패를 붙잡아 두지 않는다 — 다음 시도에서 다시 받는다 (11-25 검수 A-05)
+      clientPromise = null;
+      throw error;
+    }).then(async (mod) => {
       // flowType은 ssr이 pkce로 고정 · 세션 유지·자동 갱신은 ssr 기본값(켜짐)
       const supabase = mod.createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         cookieOptions: authCookieOptions(),

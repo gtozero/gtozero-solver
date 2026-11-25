@@ -358,6 +358,7 @@ import {
 import {
   MAX_AMOUNT,
   convertBetString,
+  normalizeBetString,
   ROOT_LINE_STRING,
   INVALID_LINE_STRING,
   readableLineString,
@@ -2084,6 +2085,30 @@ export default defineComponent({
       }
     }, { flush: "sync" });
 
+    // 트리를 만든 뒤 입력(레인지·보드·팟·스택·레이크·벳·라인·표시 단위)이 바뀌면 그 트리로 실행하지 않는다.
+    // 예제·자리 채우기·공유 링크가 값을 바꿔도 «실행»이 이전 트리를 새 단위로 풀던 문제(11-25 검수 A-02)
+    const inputKey = () => JSON.stringify([
+      store.pendingRangeText, store.rangeText, config.range,
+      Array.from(config.rangeRaw[0]), Array.from(config.rangeRaw[1]), config.board,
+      config.startingPot, config.effectiveStack, config.rakePercent, config.rakeCap, config.donkOption,
+      ([
+        "oopFlopBet", "oopFlopRaise", "oopTurnBet", "oopTurnRaise", "oopTurnDonk", "oopRiverBet", "oopRiverRaise", "oopRiverDonk",
+        "ipFlopBet", "ipFlopRaise", "ipTurnBet", "ipTurnRaise", "ipRiverBet", "ipRiverRaise",
+      ] as const).map((k) => normalizeBetString(config[k], k.endsWith("Raise"))),
+      config.addAllInThreshold, config.forceAllInThreshold, config.mergingThreshold,
+      config.addedLines, config.removedLines, store.displayUnitScale,
+    ]);
+    let builtKey = "";
+    // 계산이 시작된 뒤(결과·노드 락 재계산)는 건드리지 않는다 — 그때는 «실행»이 이미 막혀 있다
+    const dropStaleTree = () => {
+      if (!isTreeBuilt.value || isTreeBuilding.value || store.hasSolverRun || lockStore.busy) return false;
+      if (inputKey() === builtKey) return false;
+      isTreeBuilt.value = false;
+      treeStatusState.value = { type: "notLoaded" };
+      return true;
+    };
+    watch(inputKey, dropStaleTree);
+
     const buildTree = async (forceSingleThread = false) => {
       if (isTreeBuilding.value || store.isSolverRunning || store.isFinalizing || lockStore.busy) return false;
       clearSolverRetry();
@@ -2101,6 +2126,7 @@ export default defineComponent({
         return false;
       }
 
+      builtKey = inputKey();
       saveConfigTmp();
       isTreeBuilding.value = true;
       store.isSolverPaused = false;
@@ -2164,6 +2190,12 @@ export default defineComponent({
 
         isTreeBuilt.value = true;
         treeStatusState.value = { type: "built", threads: numThreads.value };
+        // 만드는 동안 입력이 바뀌었으면 감시가 건너뛰었다 — 여기서 다시 본다
+        if (inputKey() !== builtKey) {
+          isTreeBuilt.value = false;
+          treeStatusState.value = { type: "notLoaded" };
+          return false;
+        }
         return true;
       } catch (error) {
         recoverFromFailure(error);
@@ -2186,7 +2218,7 @@ export default defineComponent({
           lockStore.busy = false;
           return;
         }
-      } else if (!canRun.value) return;
+      } else if (!canRun.value || dropStaleTree()) return;
       beginFeedbackSolve(); // F1_FEEDBACK_ONLY
       closeCalcFailed("interrupted");
       // 설정 구간(이용 기록) — 값은 구간 이름으로만 · 완료·실패 때 같은 값으로 다시 적는다
@@ -2522,6 +2554,8 @@ export default defineComponent({
     };
     const estimateText = computed(() => {
       if (!isTreeBuilt.value || treeStatusState.value.type !== "built") return "";
+      // 고른 모드가 메모리 한도를 넘으면 [솔버 실행]이 꺼져 있다 — 못 돌리는 계산의 시간은 보이지 않는다
+      if (memoryUsageSelected.value > maxMemoryUsage) return "";
       const ms = estimateSolveMs({
         uncompressedBytes: memoryUsage.value,
         compressed: isCompressionEnabled.value,
@@ -2536,7 +2570,8 @@ export default defineComponent({
     // 곡선 어림 세 가지를 바꿔 봐도 같음) — 틀린 카운트다운보다 «현재 오차 → 목표» 줄과 «결과 →»(오차 1%)가 낫다.
 
     // ── MB-636 ④ 같은 문제가 플랍 조회에 있으면 안내 (조건 = precomputed-spot.ts) ── // R2_REVIEW_ONLY
-    const precomputedSpot = computed(() => (FEATURE_TRAINER ? matchPrecomputedSpot(config, store.rangeText) : null)); // R2_REVIEW_ONLY
+    // 노드 락을 건 계산은 미리 계산한 답과 다른 문제다 — 안내하지 않는다(11-25 오류 검수) // R2_REVIEW_ONLY
+    const precomputedSpot = computed(() => (FEATURE_TRAINER && !lockStore.locks.length && !lockStore.appliedLocks.length ? matchPrecomputedSpot(config, store.rangeText) : null)); // R2_REVIEW_ONLY
     const flopStudyTitle = computed(() => (FEATURE_TRAINER ? flopStudyLabels(i18n.locale).navTitle : "")); // R2_REVIEW_ONLY
     const openPrecomputed = () => { // R2_REVIEW_ONLY
       const spot = precomputedSpot.value; // R2_REVIEW_ONLY

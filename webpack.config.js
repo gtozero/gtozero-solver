@@ -70,8 +70,16 @@ class GenerateServiceWorkerPlugin {
           }
 
           const entryFiles = [];
+          // 시작 청크가 정적으로 불러오는 wasm(레인지·트리 편집기 · 약 270KB)은 앱이 마운트되려면 꼭 있어야 한다 —
+          // 빼 두면 첫 방문 뒤 HTTP 캐시가 비었을 때 오프라인에서 앱이 뜨지 않았다 (11-25 검수 A-09)
+          const startWasm = [];
           for (const entry of compilation.entrypoints.values()) {
             for (const file of entry.getFiles()) entryFiles.push(file.replace(/\\/g, "/"));
+            for (const chunk of entry.chunks) {
+              for (const file of chunk.auxiliaryFiles) {
+                if (/\.module\.wasm$/.test(file)) startWasm.push("/" + file.replace(/\\/g, "/"));
+              }
+            }
           }
 
           const shell = [
@@ -82,6 +90,7 @@ class GenerateServiceWorkerPlugin {
               .filter((n) => /\.(js|css)$/.test(n) && !lazyFiles.has(n))
               .map((n) => "/" + n),
             ...entryFiles.filter((f) => /\.(js|css)$/.test(f)).map((f) => "/" + f),
+            ...startWasm,
             ...// ⚠ 매니페스트는 언어별로 8개다 — 하나만 캐시하면 오프라인에서 다른 언어의
             // 설치 프롬프트가 이름을 못 읽는다 (2026-08-22 언어별 매니페스트 도입)
             names.filter((n) => n === "favicon.png" || /^manifest(-[\w-]+)?\.webmanifest$/.test(n)).map((n) => "/" + n),
@@ -113,7 +122,7 @@ class GenerateServiceWorkerPlugin {
 
           compilation.emitAsset("sw.js", new RawSource(source));
           console.log(
-            `[sw] 생성 완료 — 버전 ${version} / 셸 ${shellList.length}개 / 학습 데이터 ${dataList.length}개`
+            `[sw] 생성 완료 — 버전 ${version} / 셸 ${shellList.length}개(시작 wasm ${startWasm.length}개) / 학습 데이터 ${dataList.length}개`
           );
         }
       );

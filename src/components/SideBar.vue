@@ -867,13 +867,17 @@ export default defineComponent({
           // 가운데로 붙인다 — 예전엔 «보일 만큼만» 움직여 활성 항목이 언제나 가장자리에
           // 딱 붙고, 옆 항목은 마지막 한 글자만 남았다(«지 ✓») — 스크롤줄이 아니라
           // 글자가 깨진 것처럼 보였다. 양쪽을 고르게 보여 주면 «더 있다»가 읽힌다.
+          // 줄 맨 앞에 붙어 있는 «다른 묶음으로» 칩이 가리는 폭은 빼고 가운데를 잡는다
+          // (uk처럼 칩 글자가 길면 활성 항목 앞부분이 칩 밑에 숨었다 — 11-25 오류 검수)
+          const chip = group.querySelector<HTMLElement>(".group-switch");
+          const chipSpace = chip ? chip.offsetWidth + 18 : 0;
           if (getComputedStyle(group).direction === "rtl") {
             const itemRect = item.getBoundingClientRect();
             const groupRect = group.getBoundingClientRect();
-            const delta = itemRect.left + itemRect.width / 2 - groupRect.left - groupRect.width / 2;
+            const delta = itemRect.left + itemRect.width / 2 - groupRect.left - (groupRect.width - chipSpace) / 2;
             group.scrollLeft = Math.max(group.clientWidth - group.scrollWidth, Math.min(0, group.scrollLeft + delta));
           } else {
-            const target = item.offsetLeft - (group.clientWidth - item.offsetWidth) / 2;
+            const target = item.offsetLeft - chipSpace - (group.clientWidth - chipSpace - item.offsetWidth) / 2;
             group.scrollLeft = Math.max(0, Math.min(target, group.scrollWidth - group.clientWidth));
           }
           syncMenuFade(group);

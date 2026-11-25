@@ -61,7 +61,8 @@ export const fetchLeaderboard = async (day: string): Promise<Leaderboard | null>
           .select("user_id", { count: "exact", head: true })
           .eq("day", day)
           .lt("loss_bb", mine.data.loss_bb);
-        myRank = (better.count ?? 0) + 1;
+        // 세기에 실패하면 «앞선 사람 0명»(1위)이 아니라 순위 없음(0)으로 둔다 (11-25 검수 A-08)
+        myRank = better.error || better.count === null ? 0 : better.count + 1;
       }
     }
 

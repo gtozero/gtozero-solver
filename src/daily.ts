@@ -111,8 +111,8 @@ export const dropStaleDaily = () => {
 };
 
 /** 오늘의 문제 — 날짜가 같으면 누구에게나 같은 문제가 나온다 */
-export const makeDailyQuestion = (bank: TrainerBank): TrainerQuestion | null =>
-  makeTrainerQuestion(bank, "all", seededRandom(seedFrom(todayKey())));
+export const makeDailyQuestion = (bank: TrainerBank, date: string = todayKey()): TrainerQuestion | null =>
+  makeTrainerQuestion(bank, "all", seededRandom(seedFrom(date)));
 
 /** 이 탭의 기기 자료가 지금 계정 것으로 확인된 뒤에만 읽는다(관문이 닫히면 빈 기록 그대로) */
 export const loadDailyState = async () => {
@@ -142,9 +142,11 @@ export const loadDailyState = async () => {
 };
 
 /** 오늘의 문제를 풀었을 때 호출 */
-export const recordDaily = async (lossBb: number) => {
+export const recordDaily = async (lossBb: number, questionDate?: string) => {
   if (!(await isLocalDataOpen())) return;
   const today = todayKey();
+  // 출제한 날짜가 지났으면 어제 문제의 답이다 — 오늘 기록으로 남기지 않는다 (11-25 검수 A-06)
+  if (questionDate && questionDate !== today) return;
   // 화면 상태가 아니라 저장된 결과의 날짜로 — 자정을 넘긴 탭은 어제 «풀었음»이 남아 오늘 기록이 막혔다
   const stored = readDailyResult();
   if (stored?.date === today) {
@@ -161,12 +163,13 @@ export const recordDaily = async (lossBb: number) => {
     }
   })();
   const yesterday = todayKey(new Date(Date.now() - 24 * 60 * 60 * 1000));
-  const streak = last === yesterday ? dailyState.streak + 1 : 1;
+  // 연속 일수도 저장된 최신 값에서 — 오래 열어 둔 다른 탭의 화면 값(0)으로 줄어들었다 (11-25 검수 A-07)
+  const streak = last === yesterday ? readNumber(KEY_STREAK) + 1 : 1;
 
   dailyState.done = true;
   dailyState.lossBb = lossBb;
   dailyState.streak = streak;
-  dailyState.bestStreak = Math.max(dailyState.bestStreak, streak);
+  dailyState.bestStreak = Math.max(readNumber(KEY_BEST), streak);
 
   writeValue(KEY_LAST, today);
   writeValue(KEY_STREAK, String(streak));

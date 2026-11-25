@@ -1093,6 +1093,7 @@ export default defineComponent({
         }
       };
 
+    // 모르는 항목을 가리키는 알림(다른 탭이 원격 목록을 받아 와 바꾼 경우)은 막지 않고 기기 목록을 다시 읽는다 (11-25 검수 A-03)
     channel.onmessage = async (event: MessageEvent<Message>) => {
       if (errorOccured.value) return;
       // 기기 자료 관문이 닫힌 탭(다른 계정 확인 실패)은 목록 알림도 받지 않는다 (MB-388 ① · 6차 N2)
@@ -1107,8 +1108,8 @@ export default defineComponent({
         if (message.path.length > 1) {
           selectedValue.value = JSON.stringify(message.path.slice(0, -1));
           if (selectedItem.value === null) {
-            errorOccured.value = true;
             selectedValue.value = false;
+            onSyncReplaced();
             return;
           }
         } else {
@@ -1122,8 +1123,8 @@ export default defineComponent({
         // overwrite item
         selectedValue.value = pathStr;
         if (selectedItem.value === null) {
-          errorOccured.value = true;
           selectedValue.value = false;
+          onSyncReplaced();
           return;
         }
         await addOrOverwriteItem(message.value);
@@ -1131,8 +1132,8 @@ export default defineComponent({
         // rename item
         selectedValue.value = pathStr;
         if (selectedItem.value === null) {
-          errorOccured.value = true;
           selectedValue.value = false;
+          onSyncReplaced();
           return;
         }
         await tryRename(selectedItem.value.item, message.newName);
@@ -1141,8 +1142,8 @@ export default defineComponent({
         if (message.path.length > 1) {
           selectedValue.value = JSON.stringify(message.path.slice(0, -1));
           if (selectedItem.value === null) {
-            errorOccured.value = true;
             selectedValue.value = false;
+            onSyncReplaced();
             return;
           }
         } else {
@@ -1153,8 +1154,8 @@ export default defineComponent({
         // delete item
         selectedValue.value = pathStr;
         if (selectedItem.value === null) {
-          errorOccured.value = true;
           selectedValue.value = false;
+          onSyncReplaced();
           return;
         }
         await deleteItem(false);

@@ -225,10 +225,10 @@ import {
   defendRangeTextFor,
   vs3betGridsFor,
   vs3betStatsFor,
-  vs3betRangeTextFor,
+  vs3betReachTextFor,
   vs4betGridsFor,
   vs4betStatsFor,
-  vs4betRangeTextFor,
+  vs4betReachTextFor,
 } from "../preflop-charts";
 import { ranks } from "../utils";
 
@@ -2005,13 +2005,14 @@ export default defineComponent({
     };
 
     const copyVs3bet = async (action: "fourBet" | "call") => {
-      await writeClipboard(vs3betRangeTextFor(selectedVs3bet.value, action));
+      // 솔버 입력용이라 앞선 오픈 빈도를 곱한 도달 레인지를 복사한다(표는 조건부 그대로)
+      await writeClipboard(vs3betReachTextFor(selectedVs3bet.value, action));
       copiedAction.value = action;
       setTimeout(() => (copiedAction.value = ""), 1500);
     };
 
     const copyVs4bet = async (action: "fiveBet" | "call") => {
-      await writeClipboard(vs4betRangeTextFor(selectedVs4bet.value, action));
+      await writeClipboard(vs4betReachTextFor(selectedVs4bet.value, action));
       copiedAction.value = action;
       setTimeout(() => (copiedAction.value = ""), 1500);
     };

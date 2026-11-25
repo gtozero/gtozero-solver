@@ -102,6 +102,8 @@ self.addEventListener("fetch", (event) => {
           }
           return fresh;
         } catch (e) {
+          // /study/ 주소에 공개 앱 HTML을 주면 상대 경로 번들이 /study/ 아래로 요청돼 앱이 뜨지 않았다 → 루트로 보낸다 (11-25 검수 B-04)
+          if (/^\/study(\/|$)/.test(url.pathname)) return Response.redirect("/", 302);
           const cached = await caches.match("/index.html");
           if (cached) return cached;
           throw e;

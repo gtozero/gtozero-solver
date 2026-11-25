@@ -3085,13 +3085,16 @@ export default defineComponent({
     const scrollToStats = () => scrollToId("trainer-stats");
     const scrollToDetail = () => scrollToId("trainer-detail");
 
+    // 오늘의 문제를 낸 날짜 — 자정을 넘겨 답하면 어제 문제의 답이 오늘 기록·순위로 들어갔다 (11-25 검수 A-06)
+    let dailyQuestionDate = "";
     const nextQuestion = () => {
       evaluation.value = null;
       rngRoll.value = rollRng();
       if (!bank.value) return;
       if (dailyMode.value) {
         dropStaleDaily();
-        question.value = makeDailyQuestion(bank.value);
+        dailyQuestionDate = todayKey();
+        question.value = makeDailyQuestion(bank.value, dailyQuestionDate);
       } else if (reviewMode.value && reviewAttempts.value.length) {
         const attempt = reviewAttempts.value[reviewIndex % reviewAttempts.value.length];
         reviewIndex++;
@@ -3110,6 +3113,12 @@ export default defineComponent({
 
     const choose = async (actionIndex: number) => {
       if (!question.value || evaluation.value) return;
+      // 날짜가 바뀌었으면 채점하지 않고 새 날짜의 문제로 바꾼다
+      if (dailyMode.value && dailyQuestionDate !== todayKey()) {
+        nextQuestion();
+        return;
+      }
+      const questionDate = dailyQuestionDate;
       evaluation.value = evaluateTrainerAction(question.value, actionIndex);
       const result = evaluation.value;
       // 답을 고른 순간의 모드로 기록한다 — 저장을 기다리는 사이 오늘의 문제로 넘어가면
@@ -3135,7 +3144,7 @@ export default defineComponent({
       });
       attempts.value = await getTrainerAttempts();
       if (answeredDaily) {
-        await recordDaily(result.evLossBb);
+        await recordDaily(result.evLossBb, questionDate);
         // 로그인 상태면 오늘의 순위에도 올린다 (첫 기록만 유효 — 서버가 중복 무시)
         if (account.value) void submitToBoard();
       }
