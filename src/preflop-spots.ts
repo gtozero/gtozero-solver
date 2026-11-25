@@ -190,7 +190,7 @@ export const FOUR_BET_SPOTS: SrpSpot[] = VS4BET_SCENARIOS.map(
 // 출시 스위치 — 서버 계산 → R2 업로드(v1/limp-sb-bb-hrc · flop-reports/limp-sb-bb-hrc.json) → Worker 배포 뒤에 켠다.
 // 켜면 상황 id는 그대로(«limp-sb-bb» · 지난 기록·회원 판정·부류가 안 바뀐다) 레인지만 HRC 값으로, 자료는 limpDataId()의 폴더에서 받는다.
 // 끄면 지금 라이브 그대로(실전형 근사 레인지 + «근사 레인지» 안내 줄).
-export const LIMP_HRC_LAUNCHED = false;
+export const LIMP_HRC_LAUNCHED = true;
 /** localhost 검사용: localStorage `solver.limpHrc.test` = "1"이면 꺼져 있어도 켠다. */
 const LIMP_HRC_TEST_KEY = "solver.limpHrc.test";
 export const limpHrcEnabled = (): boolean => {

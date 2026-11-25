@@ -582,8 +582,14 @@ export const getTrainerAttempts = async (limit = 500) => {
 
 export const clearTrainerAttempts = async () => {
   if (!(await unlocked())) return;
-  await db.trainerAttempts.clear();
+  // 지운 시각을 적어 둔다 — 계정에 남은 그 이전 기록이 다음 동기화 때 이 기기로 되돌아오지 않게
+  await db.transaction("rw", db.trainerAttempts, db.deviceMeta, async () => {
+    await db.trainerAttempts.clear();
+    await db.deviceMeta.put({ key: TRAINER_RESET_KEY, value: String(Date.now()) });
+  });
 };
+
+const TRAINER_RESET_KEY = "trainerResetAt";
 
 /**
  * 계정에서 내려받은 기록 중 기기에 없는 것만 넣는다.
@@ -597,7 +603,10 @@ export const mergeTrainerAttempts = async (attempts: TrainerAttempt[], ownerId: 
     const existing = new Set(
       (await db.trainerAttempts.toArray()).map((item) => item.clientId)
     );
-    const fresh = attempts.filter((item) => !existing.has(item.clientId));
+    const resetAt = Number((await db.deviceMeta.get(TRAINER_RESET_KEY))?.value) || 0;
+    const fresh = attempts.filter(
+      (item) => !existing.has(item.clientId) && item.timestamp > resetAt
+    );
     if (!fresh.length) return 0;
     await db.trainerAttempts.bulkPut(fresh);
     return fresh.length;
