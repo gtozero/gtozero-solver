@@ -1114,7 +1114,7 @@ export default defineComponent({
     const displayOptions =
       props.tableMode !== "chance"
         ? reactive<DisplayOptionsBasics>({
-            barWidth: "normalized",
+            barWidth: "absolute",
             content: "percentage",
           })
         : reactive<DisplayOptionsChance>({
@@ -1128,7 +1128,10 @@ export default defineComponent({
       if (props.tableMode !== "chance") {
         const saved = JSON.parse(savedDisplayOptions) as DisplayOptionsBasics;
         const options = displayOptions as DisplayOptionsBasics;
-        if (barWidthListBasics.includes(saved.barWidth)) {
+        // MB-648: 예전 기본값 «normalized»는 한 번만 새 기본값(absolute)으로 (ResultMiddle과 같음)
+        const legacyDefault =
+          (saved as { v?: number }).v !== 2 && saved.barWidth === "normalized";
+        if (barWidthListBasics.includes(saved.barWidth) && !legacyDefault) {
           options.barWidth = saved.barWidth;
         }
         if (contentListBasics.includes(saved.content)) {
@@ -1144,7 +1147,10 @@ export default defineComponent({
     }
 
     const updateDisplayOptions = () => {
-      localStorage.setItem(optionsStorageKey, JSON.stringify(displayOptions));
+      localStorage.setItem(
+        optionsStorageKey,
+        JSON.stringify({ ...displayOptions, v: 2 })
+      );
     };
 
     const tableDiv = ref<HTMLDivElement | null>(null);

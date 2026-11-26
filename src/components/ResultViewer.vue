@@ -611,7 +611,7 @@ export default defineComponent({
     const displayOptions = ref<DisplayOptions>({
       playerBasics: "auto",
       playerChance: "auto",
-      barHeight: "normalized",
+      barHeight: "absolute",
       suit: "grouped",
       strategy: "show",
       contentBasics: "default",

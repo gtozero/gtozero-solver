@@ -745,7 +745,7 @@ export default defineComponent({
     const displayOptions = reactive<Types.DisplayOptions>({
       playerBasics: "auto",
       playerChance: "auto",
-      barHeight: "normalized",
+      barHeight: "absolute",
       suit: "grouped",
       strategy: "show",
       contentBasics: "default",
@@ -760,7 +760,12 @@ export default defineComponent({
     if (savedDisplayOptions) {
       const saved = JSON.parse(savedDisplayOptions) as Types.DisplayOptions;
 
-      if (Types.barHeightList.includes(saved?.barHeight)) {
+      // MB-648: 예전 기본값 «normalized»가 저장돼 있으면 한 번만 새 기본값(absolute)으로 —
+      // 100% 핸드가 없는 레인지가 전부 꽉 찬 칸으로 보여 «100%로 바뀐다»는 신고가 왔다.
+      // 저장할 때 v:2를 함께 적으므로, 그 뒤 사용자가 고른 «normalized»는 그대로 둔다.
+      const legacyDefault =
+        (saved as { v?: number })?.v !== 2 && saved?.barHeight === "normalized";
+      if (Types.barHeightList.includes(saved?.barHeight) && !legacyDefault) {
         displayOptions.barHeight = saved.barHeight;
       }
       if (Types.suitList.includes(saved?.suit)) {
@@ -801,7 +806,7 @@ export default defineComponent({
       const [strategy, content] = strategyContentPair.value.split(",");
       options.strategy = strategy as Types.DisplayOptions["strategy"];
       options.contentBasics = content as Types.DisplayOptions["contentBasics"];
-      localStorage.setItem("display-options", JSON.stringify(options));
+      localStorage.setItem("display-options", JSON.stringify({ ...options, v: 2 }));
       context.emit("update:display-options", options);
     };
 
