@@ -9,6 +9,8 @@ export type MainSite = {
   shareApi: string;
   shareOrigin: string;
   reviewsSummaryApi: string;
+  /** 복기 «🔗 이 판 공유»를 받는 곳 — 빈 값이면 버튼을 숨긴다(받는 쪽 CORS가 솔버 주소 하나뿐 · MB-651) */
+  handShareApi: string;
   /** 교육 예제 해설 글 — 빈 표면 링크를 숨긴다 */
   articleUrls: Record<string, string>;
   /** 로그인 쿠키 이름 · 여러 하위 도메인이 같이 읽을 도메인(빈 값 = 이 주소만) */

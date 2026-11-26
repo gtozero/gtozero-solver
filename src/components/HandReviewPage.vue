@@ -261,6 +261,32 @@
           >
             {{ boardAskLabel }}
           </button>
+          <button
+            v-if="handShareShown && complete && records.length"
+            class="review-hand-share"
+            data-testid="review-hand-share"
+            :disabled="handShare.state.busy"
+            :aria-busy="handShare.state.busy"
+            @click="shareHand"
+          >
+            {{ handShareLabels.share }}
+          </button>
+          <p
+            v-if="handShareShown && (handShare.state.failed || handShare.state.copied || handShare.state.text)"
+            class="review-share-status"
+            role="status"
+            data-testid="review-share-status"
+          >
+            <span v-if="handShare.state.failed" data-testid="review-share-failed">{{ handShareLabels.failed }}</span>
+            <span class="review-share-pair"><input
+              v-if="handShare.state.text"
+              readonly
+              dir="ltr"
+              :value="handShare.state.text"
+              data-testid="review-share-text"
+              @focus="selectAll"
+            /><span v-if="handShare.state.copied" class="review-share-copied" data-testid="review-share-copied">{{ handShareLabels.copied }}</span></span>
+          </p>
         </div>
         <div class="review-details" v-if="selectedRow?.verdict">
           <h3>
@@ -408,6 +434,8 @@ import {
 } from "vue";
 import { i18n, localizeNumber, plCountText, arLabelIso, ltrIso } from "../i18n";
 import { BOARD_ASK_LABELS, boardAskOn, openBoardAsk } from "../board-ask";
+import { createHandShare, handShareOn, HAND_SHARE_LABELS } from "../hand-share";
+import type { ShareHand } from "../hand-share-model";
 import { M, IT_REVIEW_ACTION_BUTTONS, PL_REVIEW_ACTION_BUTTONS, TH_REVIEW_ACTION_BUTTONS } from "../hand-review-labels";
 import { SPOT_UNIT_SCALE, limpHrcEnabled } from "../preflop-spots";
 import { applyPerm, handIndex } from "../review/cards";
@@ -586,15 +614,45 @@ code === "EV_MISSING"
     const format = (template: string, values: Record<string, string>) =>
       template.replace(/\{(\w+)\}/g, (_, k) => values[k] ?? "");
     const card = (c: number) => "23456789TJQKA"[c >> 2] + "♣♦♥♠"[c & 3];
-    /* 이 판 올리기 — 자리·내 카드·보드 한 줄을 채워 글쓰기 창을 연다(복기에는 공유 주소가 없다) */
-    const postHand = () => {
-      const line = [
+    /** 자리·내 카드·보드 한 줄 — 게시판 글쓰기 창 · 공유 실패 때 복사하는 요약 */
+    const handLine = () =>
+      [
         `${seat(1)} vs ${seat(0)}`,
         `${seat(heroPlayer.value)} ${heroCards.value.map(card).join("")}`,
         board.value.map(card).join(" "),
       ].filter((part) => part.trim()).join(" · ");
-      void openBoardAsk("hand_review", line);
+    /* 이 판 올리기 — 자리·내 카드·보드 한 줄을 채워 글쓰기 창을 연다(복기에는 공유 주소가 없다) */
+    const postHand = () => {
+      void openBoardAsk("hand_review", handLine());
     };
+    /* 🔗 이 판 공유 — 본체 짧은 주소(hand-share.ts) · 판 꼴은 hand-share-model.ts. 플랍 줄은 /study/ 앱이 넘긴 짐(session)의 기록 */
+    const handShare = createHandShare();
+    watch([records, () => heroCards.value.join(), () => board.value.join()], () => handShare.clear());
+    const shareHand = () => {
+      const seatInfo = session.value;
+      if (!seatInfo) return;
+      const s = seatInfo.spot;
+      const hand: ShareHand = {
+        spotId: s.id,
+        seats: [s.oop, s.ip],
+        startingPot: s.startingPot,
+        effectiveStack: s.effectiveStack,
+        unit: SPOT_UNIT_SCALE,
+        heroPlayer: heroPlayer.value,
+        heroCards: heroCards.value.slice(),
+        board: board.value.slice(),
+        steps: records.value.map((r) => ({
+          street: r.street,
+          player: r.player,
+          kind: r.match.kind,
+          amount: r.match.actual,
+          approximated: r.match.approximated,
+          verdict: r.verdict,
+        })),
+      };
+      handShare.share(hand, handLine());
+    };
+    const selectAll = (event: Event) => (event.target as HTMLInputElement).select();
     const suitClass = (c: number) =>
       ["clubs", "diamonds", "hearts", "spades"][c & 3];
     const seat = (p: number) => (p === 0 ? spot.value?.oop : spot.value?.ip) ?? "";
@@ -1080,6 +1138,11 @@ code === "EV_MISSING"
       postHand,
       boardAskShown: boardAskOn(),
       boardAskLabel: computed(() => BOARD_ASK_LABELS[i18n.locale].post),
+      handShareShown: handShareOn(),
+      handShareLabels: computed(() => HAND_SHARE_LABELS[i18n.locale]),
+      handShare,
+      shareHand,
+      selectAll,
       suitClass,
       seat,
       actionText,
@@ -1323,6 +1386,46 @@ p {
 }
 .review-board-ask {
   margin-top: 8px;
+}
+.review-hand-share {
+  margin-top: 8px;
+}
+.review-board-ask + .review-hand-share {
+  margin-inline-start: 6px;
+}
+.review-share-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 6px;
+  color: rgb(var(--c-text-muted));
+  font-size: 11px;
+}
+/* 요약 칸과 «복사됨»은 한 덩어리 — 폰에서 «복사됨»만 다음 줄로 떨어지지 않게(MA-771 통지 ⓐ) */
+.review-share-pair {
+  display: flex;
+  flex: 1 1 12em;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.review-share-copied {
+  white-space: nowrap;
+}
+.review-share-status input {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 4px;
+  background: rgb(var(--c-bg-2));
+  color: rgb(var(--c-text-primary));
+  font-size: 11px;
+}
+.review-share-copied {
+  color: rgb(var(--c-brand));
+  font-weight: 700;
 }
 .review-practice {
   margin: 8px 0;

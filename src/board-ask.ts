@@ -9,7 +9,7 @@ import { MAIN_SITE_CONFIG } from "./main-site";
 import { trackBoardAsk } from "./usage-analytics";
 
 /** 받는 쪽 게시판이 열린 뒤에 켠다 */
-export const BOARD_ASK_LAUNCHED = false;
+export const BOARD_ASK_LAUNCHED = true;
 
 const SPOT_LIMIT = 500; // 받는 쪽이 받는 공유 주소 길이
 const TEXT_LIMIT = 200;

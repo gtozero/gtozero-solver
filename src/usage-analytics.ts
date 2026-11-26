@@ -11,6 +11,7 @@ export const trackCalcStall = (..._args: unknown[]): void => {};
 export const trackShare = (..._args: unknown[]): void => {};
 export const trackSave = (..._args: unknown[]): void => {};
 export const trackBoardAsk = (..._args: unknown[]): void => {};
+export const trackHandShare = (..._args: unknown[]): void => {};
 export const trackSubFeatureOpen = (..._args: unknown[]): void => {};
 export const trackTrainerAnswer = (..._args: unknown[]): void => {};
 export const trackLookup = (..._args: unknown[]): void => {};

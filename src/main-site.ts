@@ -20,6 +20,7 @@ export const MAIN_SITE_CONFIG: MainSite = {
   shareApi: "",
   shareOrigin: "",
   reviewsSummaryApi: "",
+  handShareApi: "", // 받는 쪽이 app.gtozero.com만 받는다 — 이 판에서는 버튼이 없다
   articleUrls: {},
   authCookie: "sb-gtozero-auth-token",
   sharedCookieDomain: "",
