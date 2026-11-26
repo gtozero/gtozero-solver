@@ -3,7 +3,7 @@
   <div
     v-else
     id="trainer-top"
-    :class="'trainer-page max-w-5xl min-w-0 flex flex-col ' + (evaluation ? 'pb-24 md:pb-10' : 'pb-10')"
+    :class="'trainer-page max-w-5xl min-w-0 flex flex-col ' + (evaluation || frequencyActive ? 'pb-24 md:pb-10' : 'pb-10')"
   >
     <div
       v-if="loadError"
@@ -69,14 +69,31 @@
           type="button"
           data-testid="trainer-rng-mode"
           :title="R.modeHelp"
-          :disabled="!!evaluation"
+          :disabled="!!evaluation || frequencyActive"
           :class="
             'button-base filter-btn ms-0 md:ms-2 ' +
-            (rngMode === 'off' ? 'bg-neutral-700 hover:bg-neutral-600' : 'button-blue')
+            (rngMode === 'off' ? 'bg-neutral-700 hover:bg-neutral-600' : 'button-blue') +
+            (frequencyActive ? ' opacity-40 cursor-not-allowed' : '')
           "
           @click="cycleRngMode"
         >
           {{ R.mode[rngMode] }}
+        </button>
+        <!-- 빈도 입력 연습: 끔 / 켬 (기기에 기억 · 오늘의 문제에선 숨김 · 출시 전에는 ?freq 로만 보임) -->
+        <button
+          v-if="frequencyEnabled && !dailyMode"
+          type="button"
+          data-testid="trainer-frequency-mode"
+          :title="Q.modeHelp"
+          :aria-pressed="frequencyMode"
+          :disabled="!!evaluation"
+          :class="
+            'button-base filter-btn ms-0 md:ms-2 ' +
+            (frequencyMode ? 'button-blue' : 'bg-neutral-700 hover:bg-neutral-600')
+          "
+          @click="toggleFrequencyMode"
+        >
+          {{ Q.mode[frequencyMode ? "on" : "off"] }}
         </button>
         <!-- 출제: 지금은 기본(교육 예제) · 누르면 «모든 플랍»(/study/ 앱)으로 -->
         <button
@@ -308,6 +325,106 @@
           </div>
         </div>
 
+        <!-- 빈도 입력: 액션 버튼 자리에 «이름+숫자 줄 / 색으로 나눈 막대+경계 손잡이 / [확인]» → 같은 자리에 결과 -->
+        <div v-if="frequencyActive || frequencyResult" data-testid="trainer-frequency">
+          <div class="mt-5 text-sm font-semibold">
+            {{ frequencyResult ? Q.resultPrompt : Q.prompt }}
+          </div>
+          <div v-if="frequencyResult" data-testid="trainer-frequency-verdict" class="mt-3">
+            <span :class="'text-base font-bold ' + verdict.className">{{ verdict.text }}</span>
+            <span class="text-sm font-semibold text-neutral-300"> · {{ Q.match(String(frequencyResult.match)) }}</span>
+          </div>
+          <!-- 라벨 줄도 막대와 같은 방향(왼→오)으로 고정 — RTL 화면에서 라벨과 막대의 좌우가 엇갈리지 않게. 라벨 안쪽은 그 글자의 방향 -->
+          <div dir="ltr" class="mt-3 flex flex-wrap gap-x-4 gap-y-1.5" data-testid="trainer-frequency-labels">
+            <div
+              v-for="(label, index) in frequencyLabels"
+              :key="index"
+              dir="auto"
+              class="flex min-w-0 items-baseline gap-1.5 text-sm font-semibold"
+            >
+              <span
+                class="inline-block h-2.5 w-2.5 shrink-0 self-center rounded-sm"
+                :style="{ background: frequencyColors[index] }"
+              ></span>
+              <span class="min-w-0">{{ label }}</span>
+              <b dir="ltr" class="text-xl tabular-nums leading-none" data-testid="trainer-frequency-value">{{ frequencyValues[index] }}</b>
+              <small v-if="frequencyResult" dir="auto" class="text-xs font-semibold text-neutral-400 tabular-nums whitespace-nowrap">
+                {{ Q.solver }} {{ frequencySolverPct[index] }}
+              </small>
+            </div>
+          </div>
+          <div v-if="frequencyResult" class="mt-2.5 text-xs text-neutral-500">{{ Q.mine }}</div>
+          <!-- 막대는 방향 고정(ltr) — 라벨 순서 = 막대 순서 = 액션 순서 -->
+          <div
+            ref="frequencyBar"
+            data-rtl-island="frequency"
+            dir="ltr"
+            data-testid="trainer-frequency-bar"
+            :class="'frequency-bar relative ' + (frequencyResult ? 'mt-1' : 'mt-2.5 cursor-pointer')"
+            @pointerdown="onFrequencyPointerDown"
+            @pointermove="onFrequencyPointerMove"
+            @pointerup="onFrequencyPointerEnd"
+            @pointercancel="onFrequencyPointerEnd"
+            @lostpointercapture="onFrequencyPointerEnd"
+          >
+            <div class="flex h-[52px] overflow-hidden rounded-lg bg-neutral-900">
+              <div
+                v-for="(value, index) in frequencyValues"
+                :key="index"
+                class="h-full"
+                :style="{ width: value + '%', background: frequencyColors[index] }"
+              ></div>
+            </div>
+            <template v-if="!frequencyResult">
+              <div
+                v-for="(cut, index) in frequencyCuts"
+                :key="index"
+                role="slider"
+                tabindex="0"
+                data-testid="trainer-frequency-handle"
+                :aria-label="frequencyLabels[index] + ' | ' + frequencyLabels[index + 1]"
+                :aria-valuemin="index > 0 ? frequencyCuts[index - 1] : 0"
+                :aria-valuemax="index + 1 < frequencyCuts.length ? frequencyCuts[index + 1] : 100"
+                :aria-valuenow="cut"
+                :aria-valuetext="frequencySliderText(index)"
+                class="frequency-handle"
+                :style="{ left: cut + '%' }"
+                @keydown="onFrequencyKey($event, index)"
+              ></div>
+            </template>
+          </div>
+          <template v-if="frequencyResult">
+            <div class="mt-2 text-xs text-neutral-500">{{ Q.solver }}</div>
+            <div
+              data-rtl-island="frequency-solver"
+              dir="ltr"
+              data-testid="trainer-frequency-solver-bar"
+              class="mt-1 flex h-[22px] overflow-hidden rounded-lg bg-neutral-900"
+            >
+              <div
+                v-for="(action, index) in evaluation ? evaluation.actions : []"
+                :key="index"
+                class="h-full"
+                :style="{ width: action.frequency * 100 + '%', background: frequencyColors[index] }"
+              ></div>
+            </div>
+            <div v-if="frequencyAdvice" class="mt-3 text-sm text-neutral-200" data-testid="trainer-frequency-advice">{{ frequencyAdvice }}</div>
+            <div class="mt-0.5 text-xs text-neutral-400">
+              {{ $n(Q.evLoss(evaluation ? evaluation.evLossBb.toFixed(3) : "0")) }}{{ frequencyResult.verdict === "mix" ? Q.mixNote : "" }}
+            </div>
+            <p class="mt-2 text-xs text-neutral-500">{{ Q.basis(frequencyClosePp) }}</p>
+          </template>
+          <button
+            v-else
+            type="button"
+            data-testid="trainer-frequency-confirm"
+            class="hidden md:block mt-4 button-base w-full bg-brand text-brand-ink hover:bg-brand-hover py-2.5 text-base font-bold"
+            @click="submitFrequency"
+          >
+            {{ Q.confirm }}
+          </button>
+        </div>
+        <template v-else>
         <div class="mt-5 text-sm font-semibold">
           {{ evaluation ? L.yourChoice : L.prompt }}
         </div>
@@ -345,6 +462,7 @@
             </span>
           </button>
         </div>
+        </template>
 
       </div>
 
@@ -355,10 +473,11 @@
       >
         <template v-if="evaluation">
           <!-- 모바일은 하단 고정 바가 같은 내용을 이고 있어 여기선 감춘다 -->
-          <div :class="'hidden md:block text-lg font-bold ' + verdict.className">
+          <!-- 빈도 입력은 판정·EV 손실을 문제 칸(막대 위아래)에 이미 보여 준다 -->
+          <div v-if="!frequencyResult" :class="'hidden md:block text-lg font-bold ' + verdict.className">
             {{ verdict.text }}
           </div>
-          <div class="hidden md:block mt-0.5 text-sm text-neutral-400">
+          <div v-if="!frequencyResult" class="hidden md:block mt-0.5 text-sm text-neutral-400">
             {{ L.evLoss }}
             <b dir="ltr" class="tabular-nums text-neutral-200">
               {{ $n(evaluation.evLossBb.toFixed(3)) }}bb
@@ -607,6 +726,20 @@
           {{ dailyMode && dailyState.done ? L.keepPracticing : L.nextHand }}
         </button>
       </div>
+      <!-- 빈도 입력: 답하기 전에는 같은 하단 바에 [확인] (답한 뒤에는 위의 판정 바가 이어받는다) -->
+      <div
+        v-else-if="frequencyActive"
+        class="md:hidden fixed inset-x-0 bottom-0 z-20 border-t border-neutral-700 bg-neutral-900/95 px-3 py-2 backdrop-blur"
+      >
+        <button
+          type="button"
+          data-testid="trainer-frequency-confirm-mobile"
+          class="button-base w-full bg-brand text-brand-ink hover:bg-brand-hover py-2.5 text-base font-bold"
+          @click="submitFrequency"
+        >
+          {{ Q.confirm }}
+        </button>
+      </div>
 
       <!-- 성적 카드 미리보기 — 기기 안에서 그린 이미지를 공유/저장한다 -->
       <div
@@ -650,7 +783,7 @@
 <script lang="ts">
 // 교육 예제 개수 — 문구에 숫자를 박지 않는다(검수장 권고)
 const SPOT_COUNT = PRESETS.length; // PRESETS import below is hoisted
-import { computed, defineComponent, onMounted, onUnmounted, ref } from "vue";
+import { computed, defineComponent, onMounted, onUnmounted, ref, watch } from "vue";
 import CustomTrainerPage from "./CustomTrainerPage.vue";
 import { MAIN_SITE_CONFIG } from "../main-site";
 import { customTrainerState } from "../custom-trainer";
@@ -716,6 +849,22 @@ import {
   trainerRngEnabled,
 } from "../trainer-rng";
 import { RNG_M } from "../trainer-rng-labels";
+import {
+  FREQUENCY_CLOSE_PP,
+  classifyFrequencyAnswer,
+  cutsToFrequencies,
+  frequencyActionColorKey,
+  initialCuts,
+  moveCut,
+  nearestCut,
+  nudgeCut,
+  readFrequencyMode,
+  trainerFrequencyEnabled,
+  writeFrequencyMode,
+} from "../trainer-frequency";
+import type { FrequencyResult } from "../trainer-frequency";
+import { FREQ_M } from "../trainer-frequency-labels";
+import { actionColors } from "../action-colors";
 import { cardText, formatBb } from "../utils";
 import { flopTrainerLabels } from "../flop-trainer-labels";
 import { uxHintLabels } from "../ux-hint-labels";
@@ -3017,6 +3166,117 @@ export default defineComponent({
       } as TrainerQuestion;
     };
 
+    /* 빈도 입력 연습 — 액션 하나 대신 각 액션의 비율을 막대로 답한다 (설계 참고자료/빈도입력연습_설계안_2026-11-26.md)
+     * 출시 스위치가 꺼져 있으면(주소에 ?freq 없음) 칩도 없고 아래 값은 전부 «끔»에 머문다. 오늘의 문제에선 쓰지 않는다 */
+    const Q = computed(() => FREQ_M[i18n.locale as keyof typeof FREQ_M] ?? FREQ_M.en);
+    const frequencyEnabled = trainerFrequencyEnabled();
+    const frequencyMode = ref(frequencyEnabled ? readFrequencyMode() : false);
+    const frequencyActive = computed(
+      () => frequencyMode.value && !dailyMode.value && !!question.value
+    );
+    const toggleFrequencyMode = () => {
+      // RNG 칩과 같다 — 채점 뒤에 바꾸면 결과 칸 모양이 바뀐다. 다음 문제부터
+      if (evaluation.value) return;
+      frequencyMode.value = !frequencyMode.value;
+      writeFrequencyMode(frequencyMode.value);
+    };
+    const frequencyResult = ref<FrequencyResult | null>(null);
+    const frequencyCuts = ref<number[]>([]);
+    const frequencyActionCount = computed(
+      () => question.value?.node.selectedSpot.actions.length ?? 0
+    );
+    // 새 문제(다음 핸드·복습·카테고리)마다 처음 경계로 — 액션 수가 바뀌어도 여기서 다시 잡힌다
+    const resetFrequencyCuts = () => {
+      frequencyCuts.value = initialCuts(Math.max(1, frequencyActionCount.value));
+    };
+    watch(question, resetFrequencyCuts, { immediate: true });
+    const frequencyValues = computed(() => {
+      const count = Math.max(1, frequencyActionCount.value);
+      const cuts =
+        frequencyCuts.value.length === count - 1 ? frequencyCuts.value : initialCuts(count);
+      return cutsToFrequencies(cuts);
+    });
+    const frequencyColors = computed(() =>
+      actionColors(
+        (question.value?.node.selectedSpot.actions ?? []).map(frequencyActionColorKey)
+      )
+    );
+    const frequencyLabels = computed(() => {
+      const q = question.value;
+      if (!q) return [];
+      return q.node.selectedSpot.actions.map((action) =>
+        trainerActionLabel(
+          action,
+          q.node.selectedSpot.pot ?? q.node.startingPot,
+          q.node.unitScale,
+          "label"
+        )
+      );
+    });
+    const frequencySolverPct = computed(() =>
+      (evaluation.value?.actions ?? []).map((a) => Math.round(a.frequency * 100))
+    );
+    const frequencyAdvice = computed(() => {
+      const r = frequencyResult.value;
+      if (!r) return "";
+      // 손해 판정에서는 «정확해요·같은 답» 조언을 쓰지 않는다 (일치도는 반올림이라 100이어도 손실이 클 수 있다)
+      if (r.verdict === "losing" && r.shortAction < 0) return "";
+      if (r.verdict !== "losing") {
+        if (r.match === 100) return Q.value.advice.exact;
+        if (r.verdict === "close" || r.shortAction < 0) return Q.value.advice.close;
+      }
+      return Q.value.advice.short(
+        evaluation.value?.actions[r.shortAction]?.label ?? "",
+        String(r.shortBy)
+      );
+    });
+    const frequencyClosePp = String(FREQUENCY_CLOSE_PP);
+
+    // 막대: 아무 데나 누르면 가장 가까운 손잡이가 오고, 그대로 끈다 (pointer capture — 막대 밖으로 나가도 놓치지 않음)
+    const frequencyBar = ref<HTMLElement | null>(null);
+    let draggingCut = -1;
+    const barPercent = (event: PointerEvent) => {
+      const rect = frequencyBar.value?.getBoundingClientRect();
+      return rect && rect.width ? ((event.clientX - rect.left) / rect.width) * 100 : 0;
+    };
+    const onFrequencyPointerDown = (event: PointerEvent) => {
+      if (evaluation.value || !frequencyCuts.value.length || !frequencyBar.value) return;
+      const value = barPercent(event);
+      draggingCut = nearestCut(frequencyCuts.value, value);
+      frequencyCuts.value = moveCut(frequencyCuts.value, draggingCut, value);
+      try {
+        frequencyBar.value.setPointerCapture(event.pointerId);
+      } catch {
+        /* 합성 이벤트 등 capture가 안 되는 경우 — 누른 자리 이동은 이미 끝났다 */
+      }
+      event.preventDefault();
+    };
+    const onFrequencyPointerMove = (event: PointerEvent) => {
+      if (draggingCut < 0 || evaluation.value) return;
+      frequencyCuts.value = moveCut(frequencyCuts.value, draggingCut, barPercent(event));
+    };
+    const onFrequencyPointerEnd = () => {
+      draggingCut = -1;
+    };
+    onUnmounted(onFrequencyPointerEnd);
+    const onFrequencyKey = (event: KeyboardEvent, index: number) => {
+      if (evaluation.value) return;
+      const direction =
+        event.key === "ArrowRight" || event.key === "ArrowUp"
+          ? 1
+          : event.key === "ArrowLeft" || event.key === "ArrowDown"
+          ? -1
+          : 0;
+      if (!direction) return;
+      event.preventDefault();
+      frequencyCuts.value = nudgeCut(frequencyCuts.value, index, direction);
+    };
+    const frequencySliderText = (index: number) => {
+      const labels = frequencyLabels.value;
+      const values = frequencyValues.value;
+      return `${labels[index]} ${values[index]} · ${labels[index + 1]} ${values[index + 1]}`;
+    };
+
     /* RNG 연습 — 숫자는 문제마다 새로 뽑고, 오늘의 문제에선 쓰지 않는다 */
     const R = computed(() => RNG_M[i18n.locale as keyof typeof RNG_M] ?? RNG_M.en);
     const rngEnabled = trainerRngEnabled();
@@ -3025,10 +3285,12 @@ export default defineComponent({
     const cycleRngMode = () => {
       // 채점 뒤에 바꾸면 같은 답의 판정이 뒤집혔다 — 다음 문제부터 바꾼다
       if (evaluation.value) return;
+      // 빈도 입력일 때는 흐리게 두고 바꾸지 않는다 (RNG는 «고르기»에만 뜻이 있다)
+      if (frequencyActive.value) return;
       rngMode.value = nextRngMode(rngMode.value);
     };
     const rngActive = computed(
-      () => rngMode.value !== "off" && !dailyMode.value && !!question.value
+      () => rngMode.value !== "off" && !dailyMode.value && !!question.value && !frequencyActive.value
     );
     const rngBandList = computed(() => {
       const mode = rngMode.value;
@@ -3064,6 +3326,18 @@ export default defineComponent({
     const verdict = computed(() => {
       const result = evaluation.value;
       if (!result) return { text: "", className: "" };
+      // 빈도 입력으로 답했으면 세 색 판정 (빨강은 실제 손해에만)
+      const freq = frequencyResult.value;
+      if (freq)
+        return {
+          text: Q.value.verdict[freq.verdict],
+          className:
+            freq.verdict === "losing"
+              ? "text-red-300"
+              : freq.verdict === "close"
+              ? "text-emerald-300"
+              : "text-brand",
+        };
       // RNG가 켜졌으면 숫자 구간으로 채점 (기록되는 EV 손실·통계는 그대로)
       const rng = rngResult.value;
       if (rng) {
@@ -3089,6 +3363,9 @@ export default defineComponent({
     let dailyQuestionDate = "";
     const nextQuestion = () => {
       evaluation.value = null;
+      frequencyResult.value = null;
+      // 같은 문제가 다시 뽑히면 watch(question)가 안 돈다 — 여기서도 처음 경계로
+      resetFrequencyCuts();
       rngRoll.value = rollRng();
       if (!bank.value) return;
       if (dailyMode.value) {
@@ -3107,6 +3384,8 @@ export default defineComponent({
     const retrySame = () => {
       if (!question.value) return;
       evaluation.value = null;
+      frequencyResult.value = null;
+      resetFrequencyCuts();
       rngRoll.value = rollRng();
       scrollToId("trainer-top");
     };
@@ -3150,6 +3429,43 @@ export default defineComponent({
       }
       noteTrainerSolved();
       // 로그인 상태면 조용히 올린다 (실패해도 풀이 흐름을 막지 않음)
+      if (account.value) void runSync(true);
+    };
+
+    // 빈도 입력 [확인] — 채점은 trainer-frequency.ts, 기록은 «고르기»와 같은 규칙
+    // (손실 = 내 빈도로 가중한 EV 손실 → 풀이 수·통계·복습은 기존 그대로 · 일치도는 저장하지 않는다)
+    const submitFrequency = async () => {
+      if (!question.value || evaluation.value || !frequencyActive.value) return;
+      const mine = frequencyValues.value.slice();
+      // 기록의 «고른 액션» 칸에는 가장 많이 준 액션을 넣는다 (복습·통계는 이 칸을 쓰지 않는다)
+      const mainAction = mine.indexOf(Math.max(...mine));
+      const base = evaluateTrainerAction(question.value, mainAction);
+      const bestEv = base.actions[base.bestAction].evBb;
+      const result = classifyFrequencyAnswer({
+        mine,
+        solver: base.actions.map((a) => a.frequency),
+        lossesBb: base.actions.map((a) => Math.max(0, bestEv - a.evBb)),
+        goodBb: limits.value.goodBb,
+      });
+      frequencyResult.value = result;
+      evaluation.value = { ...base, evLossBb: result.evLossBb };
+      trackTrainerAnswer(
+        result.verdict === "close" ? "best" : result.verdict === "mix" ? "good" : "miss",
+        question.value.category
+      );
+      await addTrainerAttempt({
+        clientId: newClientId(),
+        timestamp: Date.now(),
+        questionId: question.value.id,
+        presetId: question.value.presetId,
+        category: question.value.category,
+        handPair: question.value.handPair,
+        selectedAction: mainAction,
+        bestAction: base.bestAction,
+        evLossBb: result.evLossBb,
+      });
+      attempts.value = await getTrainerAttempts();
+      noteTrainerSolved();
       if (account.value) void runSync(true);
     };
 
@@ -3491,6 +3807,26 @@ export default defineComponent({
       F,
       openFlopTrainer,
       retrySame,
+      Q,
+      frequencyEnabled,
+      frequencyMode,
+      frequencyActive,
+      toggleFrequencyMode,
+      frequencyResult,
+      frequencyCuts,
+      frequencyValues,
+      frequencyColors,
+      frequencyLabels,
+      frequencySolverPct,
+      frequencyAdvice,
+      frequencyClosePp,
+      frequencyBar,
+      onFrequencyPointerDown,
+      onFrequencyPointerMove,
+      onFrequencyPointerEnd,
+      onFrequencyKey,
+      frequencySliderText,
+      submitFrequency,
       rngEnabled,
       rngMode,
       rngRoll,
@@ -3595,6 +3931,28 @@ export default defineComponent({
 :global(html[dir="rtl"] .trainer-page span[dir="ltr"].ms-auto) { margin-left: 0; margin-right: auto; }
 :global(html[dir="rtl"] .trainer-page span[dir="ltr"].ms-2) { margin-left: 0; margin-right: 0.5rem; }
 /* .stat-chip은 index.css로 옮겼다 — 다른 화면도 같은 칩을 쓴다 */
+/* 빈도 입력 막대 — 끄는 동안 화면이 스크롤되거나 글자가 선택되지 않게 */
+.frequency-bar {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* 경계 손잡이: 막대 위아래로 5px 나오게 · 눌러서 잡는 것은 막대 전체가 한다(손잡이는 표시+키보드용) */
+.frequency-handle {
+  position: absolute;
+  top: -5px;
+  bottom: -5px;
+  width: 14px;
+  margin-left: -7px;
+  border-radius: 7px;
+  background: #fff;
+  box-shadow: 0 0 0 2px #262626, 0 2px 6px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+.frequency-handle:focus-visible {
+  outline: 2px solid rgb(var(--c-brand));
+  outline-offset: 2px;
+}
 .hand-tag {
   @apply rounded px-2 py-0.5 text-xs font-semibold;
 }
